@@ -1,8 +1,8 @@
 version: '3.7'
 
 services:
-  main:
-    container_name: main
+  monitoring:
+    container_name: monitoring
     build: ./
     restart: always
     environment:
