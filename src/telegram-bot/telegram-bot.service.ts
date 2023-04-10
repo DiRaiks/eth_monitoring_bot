@@ -7,6 +7,7 @@ import * as Composer from 'telegraf/composer';
 import { ethers } from 'ethers';
 
 import { EthereumService } from '../ethereum';
+import { ChatsService } from '../storage';
 
 export const validateAddressInput = (
   address: string,
@@ -33,10 +34,12 @@ export const validateAddressInput = (
 @Injectable()
 export class TelegramBotService {
   private readonly bot: telegraf.Telegraf<telegraf.Context>;
-  private chats: { [chatId: string]: string[] } = {};
   private subscription: ethers.JsonRpcProvider;
 
-  constructor(protected readonly ethereum: EthereumService) {
+  constructor(
+    protected readonly ethereum: EthereumService,
+    protected readonly chats: ChatsService,
+  ) {
     this.bot = new telegraf.Telegraf(process.env.TELEGRAM_BOT_TOKEN);
     this.initBot();
     this.subscribe();
@@ -48,7 +51,7 @@ export class TelegramBotService {
     });
 
     this.bot.command('stop', (ctx) => {
-      this.chats[ctx.chat.id] = [];
+      this.chats.removeChat(ctx.chat.id);
       ctx.reply('Bye!');
     });
 
@@ -56,22 +59,22 @@ export class TelegramBotService {
       const status = await this.ethereum.getSuscriptionStatus();
       ctx.reply(
         `Status: ${status.status}\nCount:${status.count}\nAddresses: ${
-          this.chats && this.chats[ctx.chat.id]
+          this.chats.getAddressesByChatId(ctx.chat.id)?.join(', ') || 'none'
         }`,
       );
     });
 
     this.bot.command('chats', async (ctx) => {
-      const chatIds = this.getChatIds();
-      ctx.reply(`Chat ids: ${chatIds}`);
+      const totalChats = this.chats.getTotalChats();
+      ctx.reply(`Total chats: ${totalChats}`);
     });
 
     this.bot.command('help', (ctx) => {
       const message =
-        `/init - зарегистрировать чат для отправки уведомлений` +
-        `\n/stop - не отправлять уведомления в текущий чат` +
-        `\n/status - статус подписки на блоки` +
-        `\n/chats - список чатов, которые получают уведомления`;
+        `/init - добавить адрес для мониторинга` +
+        `\n/stop - удалить подписку на адреса` +
+        `\n/status - статус подпискии` +
+        `\n/chats - количество подписанных чатов`;
 
       return ctx.reply(message);
     });
@@ -95,15 +98,14 @@ export class TelegramBotService {
       console.log('address', address);
       if (!address) return;
 
-      if (!this.chats[id]) this.chats[id] = [];
-
-      if (this.chats[id].includes(address)) {
+      if (this.chats.getAddressesByChatId(id)?.includes(address)) {
         ctx.reply('Address already added');
         return ctx.scene.leave();
       }
-      this.chats[id].push(address);
 
-      ctx.reply(`Addresses: ${this.chats[id].join(', ')}`);
+      this.chats.setAddressByChatId(id, address);
+
+      ctx.reply(`Addresses: ${this.chats.getAddressesByChatId(id).join(', ')}`);
       return ctx.scene.leave();
     });
 
@@ -130,14 +132,10 @@ export class TelegramBotService {
     });
   };
 
-  private getChatIds = () => {
-    return this.chats;
-  };
-
   private subscribe = async () => {
     const callback = (blockNumber: number) => async (tx) => {
-      if (!this.chats) return;
-      const allAddresses = Object.values(this.chats).flat();
+      if (!this.chats.getTotalChats()) return;
+      const allAddresses = Object.values(this.chats.getChats()).flat();
 
       if (!allAddresses.includes(tx.from) && !allAddresses.includes(tx.to))
         return;
@@ -145,10 +143,10 @@ export class TelegramBotService {
       const address = tx.from || tx.to;
 
       const message = `
-          New transaction received\nAddress: ${address}\nBlock # ${blockNumber}\nTx hash: ${tx.hash}\nEtherscan: https://etherscan.io/tx/${tx.hash}\nTx
+          New transaction received\nAddress: ${address}\nBlock #${blockNumber}\nTx hash: ${tx.hash}\nEtherscan: https://etherscan.io/tx/${tx.hash}\nTx
           ------------------------`;
-      const chatId = Object.keys(this.chats).find((key) =>
-        this.chats[key].includes(address),
+      const chatId = Object.keys(this.chats.getChats()).find((key) =>
+        this.chats.getChats()[key].includes(address),
       );
       this.sendMessage(message, chatId);
     };
