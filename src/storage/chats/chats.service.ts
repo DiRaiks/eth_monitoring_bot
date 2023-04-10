@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class ChatsService {
-  private chats: { [chatId: string]: string[] } = {};
+  protected chats: { [chatId: string]: string[] } = {};
 
   public getChats(): { [chatId: string]: string[] } {
     return this.chats;
