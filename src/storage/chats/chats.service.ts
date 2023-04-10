@@ -4,6 +4,17 @@ import { Injectable } from '@nestjs/common';
 export class ChatsService {
   protected chats: { [chatId: string]: string[] } = {};
 
+  constructor() {
+    if (process.env.DEFAULT_CHANNEL_ID) {
+      this.chats[process.env.DEFAULT_CHANNEL_ID] = [];
+
+      if (process.env.DEFAULT_ADDRESSES) {
+        this.chats[process.env.DEFAULT_CHANNEL_ID] =
+          process.env.DEFAULT_ADDRESSES.split(',');
+      }
+    }
+  }
+
   public getChats(): { [chatId: string]: string[] } {
     return this.chats;
   }

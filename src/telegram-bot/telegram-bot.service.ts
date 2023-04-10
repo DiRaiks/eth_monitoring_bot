@@ -92,10 +92,8 @@ export class TelegramBotService {
     const stepHandler = new Composer();
 
     stepHandler.hears(/^0x[0-9A-Fa-f]*$/gm, async (ctx) => {
-      console.log('CALL');
       const { id } = ctx.chat;
       const address = ctx.match.input;
-      console.log('address', address);
       if (!address) return;
 
       if (this.chats.getAddressesByChatId(id)?.includes(address)) {
