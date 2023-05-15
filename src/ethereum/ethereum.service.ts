@@ -11,7 +11,10 @@ export class EthereumService {
   }
 
   private initProvider = () => {
-    this.provider = new ethers.JsonRpcProvider(process.env.RPC_PRIVIDER, 5);
+    this.provider = new ethers.JsonRpcProvider(
+      process.env.RPC_PRIVIDER,
+      Number(process.env.CHAIN_ID),
+    );
   };
 
   public getSuscriptionStatus = async () => {
